@@ -1,0 +1,210 @@
+---
+title: "Exam Three"
+author: "Herrington"
+date: "7/9/2020"
+output: pdf_document
+---
+
+I understand that no r markdown file is a penalty but my computer will not knit and I do
+not understand the error message. It is something with my OS i beleive I will attach a screen grab in the repo$
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+#1
+```{r}
+# clear the environment
+rm(list=ls(all=TRUE))
+
+# load any packages needed
+library(tidycensus)
+library(rio)
+library(tidyverse)
+library(dplyr)
+library(data.table)
+
+```
+
+#2
+Import the Gini index
+```{r}
+
+census_api_key("f1ace18ad0202889b6017f9cb1546d83413221f5", install = TRUE,
+overwrite = TRUE)
+
+v15 <- load_variables(year = 2015,
+  "acs5")
+View(v15)
+
+v10 <- load_variables(year = 2010,
+  "acs5")
+View(v10)
+
+inequality_gini <- get_acs(geography = "us",
+  variables = c(GINI = c("B19083_001")), year = 2015)
+
+
+#import the 2010 and 2015 data
+data2015 <- get_acs(geography = "state",
+  variables = c(gini = c("B19083_001")) , year = 2015)
+
+data2015$year <-("2015")
+
+data2010 <-  get_acs(geography = "state",
+  variables = c(gini = c("B19083_001")) , year = 2010)
+
+data2010$year <-("2010")
+
+# final binding
+inequality_panel = bind_rows(data2010,data2015)
+
+#rename estimate as gini and name to state
+setnames(inequality_panel, "estimate", "gini") 
+setnames(inequality_panel, "NAME", "state") 
+
+# peak at the data
+head(inequality_panel)
+
+```
+
+#3
+reshape panel wide
+```{r}
+inequality_wide <-
+  inequality_panel %>%
+  pivot_wider(id_cols = c("state","GEOID","year","gini"),
+              names_from = "year",
+              values_from = "gini",
+              names_prefix = "gini_")
+
+head(inequality_wide)
+
+```
+
+#4 
+reshape to long
+```{r}
+inequality_long <- 
+  inequality_wide %>%
+  pivot_longer(cols = starts_with("gini"),
+               names_to = "year",
+               names_prefix = "gini",
+               values_to = "gini",
+               values_drop_na = FALSE)
+ 
+head(inequality_long)
+
+```
+
+#5
+show wide and long are equal
+```{r}
+print(nrow(inequality_wide))
+print(nrow(inequality_long))
+```
+We see that they are equal because long has twice the amount of rows as wide,
+which shows that the states/provinces are counted twice in long: 1 for each year.
+Whereas in wide they are in a single row
+
+#6
+Collapse inequality_long by state
+```{r}
+inequality_collapsed <-
+  inequality_long %>%
+  group_by(state,year, GEOID,gini) %>%
+  summarize(across(where(is.numeric), sum))
+
+ 
+```
+
+
+
+#8 and 9
+```{r}
+library(WDI)
+
+#gdp in usd
+gdp_data = WDI(country = "all", indicator = "NY.GDP.MKTP.CD", start = 2006,
+               end = 2007, extra = FALSE, cache = NULL)
+
+#deflator
+deflator_data = WDI(country = "all", indicator = "NY.GDP.DEFL.ZS",
+                    start = 2010, end = 2010,
+                    extra = FALSE, cache = NULL)
+
+usd_deflator = subset(deflator_data, country=="United States")
+
+# merge
+deflated_data = left_join(x=gdp_data,
+                          y=usd_deflator,
+                          by = "year")
+
+# deflation --- divide by deflator
+usd_deflator$deflated_amount = usd_deflator$current_amount/
+                                 (deflated_data$usd_deflator/100)
+
+```
+
+# 10
+in a shiny app the three main componets are the UI (subcomets input and output),
+the server (which stores directions and renders) and the shiny app itself which contains
+these two componets
+
+#11
+```{r}
+library(pdftools)
+library(tidyr)
+library(tidytext) 
+library(dplyr) 
+library(stringr) 
+library(ggplot2)
+
+#pull the pdf
+mytext=pdf_text(pdf = "https://pdf.usaid.gov/pdf_docs/PA00TNMG.pdf")
+
+```
+
+#12 
+convert to data frame
+```{r}
+mytext=as.data.frame(mytext)
+mytext$page=c(1:65)
+colnames(mytext)[which(names(mytext) == "mytext")] <- "text"
+```
+
+# 13
+tokenize data and remove stop words
+```{r}
+library(tokenizers)
+mytext=mytext %>% unnest_tokens(word, text)
+
+#remove stop words
+data(stop_words)
+mytext <- mytext %>% anti_join(stop_words)
+```
+
+
+# 15 
+load webpage
+```{r}
+library(rvest)
+page_data <- "https://www.billboard.com/charts/hot-100" 
+hot100exam <- read_html(page_data)
+
+#nodes
+str(hot100exam)
+body_nodes <- hot100exam %>% html_node("body") %>% html_children()
+ body_nodes
+  body_nodes %>% html_children()
+
+```
+
+Link to the git repo
+[repo](https://github.com/Dawson-Herrington-98/Data-Science-Exam-3)
+
+
